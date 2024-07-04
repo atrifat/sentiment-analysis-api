@@ -4,11 +4,14 @@ import pandas as pd
 from flask import Flask, request, jsonify
 import datetime
 import logging
+import functools
 import torch
 from transformers import pipeline
 
 load_dotenv()
 
+ENABLE_API_TOKEN = os.getenv("ENABLE_API_TOKEN", "false") == "true"
+API_TOKEN = os.getenv("API_TOKEN", "")
 APP_ENV = os.getenv("APP_ENV", "production")
 LISTEN_HOST = os.getenv("LISTEN_HOST", "0.0.0.0")
 LISTEN_PORT = os.getenv("LISTEN_PORT", "5000")
@@ -34,6 +37,9 @@ else:
         format=LOGGING_FORMAT,
     )
 
+if ENABLE_API_TOKEN and API_TOKEN == "":
+    raise Exception("API_TOKEN is required if ENABLE_API_TOKEN is enabled")
+
 app = Flask(__name__)
 
 sentiment_task = pipeline(
@@ -43,9 +49,33 @@ sentiment_task = pipeline(
 )
 
 
+def is_valid_api_key(api_key):
+    if api_key == API_TOKEN:
+        return True
+    else:
+        return False
+
+
+def api_required(func):
+    @functools.wraps(func)
+    def decorator(*args, **kwargs):
+        if ENABLE_API_TOKEN:
+            if request.json:
+                api_key = request.json.get("api_key")
+            else:
+                return {"message": "Please provide an API key"}, 400
+            # Check if API key is correct and valid
+            if request.method == "POST" and is_valid_api_key(api_key):
+                return func(*args, **kwargs)
+            else:
+                return {"message": "The provided API key is not valid"}, 403
+        else:
+            return func(*args, **kwargs)
+
+    return decorator
+
+
 def perform_sentiment_analysis(query):
-    result = []
-    temp_result = []
     default_result = {"negative": 0.0, "neutral": 0.0, "positive": 0.0}
     result = default_result
 
@@ -68,6 +98,7 @@ def handle_exception(error):
 
 
 @app.route("/detect", methods=["POST"])
+@api_required
 def predict():
     data = request.json
     q = data["q"]
