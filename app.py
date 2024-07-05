@@ -99,10 +99,12 @@ def make_key_fn():
 
 def perform_sentiment_analysis(query):
     default_result = {"negative": 0.0, "neutral": 0.0, "positive": 0.0}
+    tokenizer_kwargs = {"truncation": True, "max_length": 512}
+
     result = default_result
 
     try:
-        temp_result = sentiment_task(query, top_k=3)
+        temp_result = sentiment_task(query, top_k=3, **tokenizer_kwargs)
 
         for i, item in enumerate(temp_result):
             result[item["label"]] = item["score"]
