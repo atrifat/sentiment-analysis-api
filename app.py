@@ -22,6 +22,7 @@ SENTIMENT_ANALYSIS_MODEL = os.getenv(
 
 CACHE_DURATION_SECONDS = int(os.getenv("CACHE_DURATION_SECONDS", 60))
 ENABLE_CACHE = os.getenv("ENABLE_CACHE", "false") == "true"
+TORCH_DEVICE = os.getenv("TORCH_DEVICE", "auto")
 
 APP_VERSION = "0.0.1"
 
@@ -44,6 +45,14 @@ else:
 if ENABLE_API_TOKEN and API_TOKEN == "":
     raise Exception("API_TOKEN is required if ENABLE_API_TOKEN is enabled")
 
+if TORCH_DEVICE == "auto":
+    torch_device = 0 if torch.cuda.is_available() else -1
+else:
+    if TORCH_DEVICE == "cuda":
+        torch_device = 0
+    else:
+        torch_device = -1
+
 app = Flask(__name__)
 
 cache_config = {
@@ -58,6 +67,7 @@ sentiment_task = pipeline(
     "sentiment-analysis",
     model=SENTIMENT_ANALYSIS_MODEL,
     tokenizer=SENTIMENT_ANALYSIS_MODEL,
+    device=torch_device,
 )
 
 
